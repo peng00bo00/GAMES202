@@ -7,7 +7,7 @@ class PhongMaterial extends Material {
      * @param {float} intensity The light intensity
      * @memberof PhongMaterial
      */
-    constructor(color , colorMap , specular , intensity) {
+    constructor(color, colorMap, specular, intensity) {
         let textureSample = 0;
 
         if (colorMap != null) {
@@ -17,7 +17,7 @@ class PhongMaterial extends Material {
                 'uSampler': {type: 'texture', value: colorMap},
                 'uKd': {type: '3fv', value: color},
                 'uKs': {type: '3fv', value: specular},
-                'uLightIntensity ': {type: '1f', value: intensity}
+                'uLightIntensity': {type: '1f', value: intensity}
             }, [], PhongVertexShader, PhongFragmentShader);
         } else {
             // console.log(color);
