@@ -15,10 +15,16 @@ varying highp vec3 vFragPos;
 varying highp vec3 vNormal;
 
 // Shadow map related variables
-#define NUM_SAMPLES 20
+#define NUM_SAMPLES 128
 #define BLOCKER_SEARCH_NUM_SAMPLES NUM_SAMPLES
 #define PCF_NUM_SAMPLES NUM_SAMPLES
 #define NUM_RINGS 10
+
+#define LIGHT_WIDTH 20.0
+#define WORLD_WIDTH 200.0
+#define LIGHT_WIDTH_UV (LIGHT_WIDTH / WORLD_WIDTH)
+#define zNear 1e-2
+#define zFar 500.0
 
 #define EPS 1e-3
 #define PI 3.141592653589793
@@ -84,28 +90,123 @@ void uniformDiskSamples( const in vec2 randomSeed ) {
 }
 
 float findBlocker( sampler2D shadowMap,  vec2 uv, float zReceiver ) {
-	return 1.0;
+  float zBlocker = 0.0;
+  float filterSize = LIGHT_WIDTH_UV * zReceiver / (zReceiver + zNear);
+
+  // sample from shadowMap
+  poissonDiskSamples(uv);
+  float numBlocker = 0.0;
+  for (int i = 0; i < BLOCKER_SEARCH_NUM_SAMPLES; i++) {
+    vec2 sample = poissonDisk[i] * filterSize + uv;
+    sample = clamp(sample, 0.0, 1.0);
+
+    // extract and unpack sample depth
+    vec4 depthVec = texture2D(shadowMap, sample);
+    float depth = unpack(depthVec);
+
+    // take sum of the blockers (not all the samples)
+    if (depth < zReceiver) {
+      zBlocker += depth;
+      numBlocker += 1.0;
+    }
+  }
+
+  if (numBlocker == 0.0) return zReceiver;
+
+	return zBlocker / numBlocker;
 }
 
 float PCF(sampler2D shadowMap, vec4 coords) {
-  return 1.0;
+  float visibility = 0.0;
+
+  vec3 coord = coords.xyz / coords.w;
+  coord = coord * 0.5 + 0.5;
+
+  float filterSize = 20.0 / 1024.0;
+  poissonDiskSamples(coord.xy);
+
+  // add a bias to prevent shadow acne
+  vec3 lightDir = normalize(uLightPos);
+  vec3 normal = normalize(vNormal);
+  float bias = max(10.0 * EPS * (1.0 - dot(normal, lightDir)), EPS);
+  
+  // filtering
+  for( int i = 0; i < PCF_NUM_SAMPLES; i++ ) {
+    // add noise to the coord
+    vec2 sample = poissonDisk[i] * filterSize + coord.xy;
+    sample = clamp(sample, 0.0, 1.0);
+
+    // extract and unpack threshold
+    vec4 threVec = texture2D(shadowMap, sample);
+    float thre = unpack(threVec);
+
+    if (coord.z - bias < thre) {
+      visibility += 1.0 / float(PCF_NUM_SAMPLES);
+    }
+  }
+
+  return visibility;
 }
 
 float PCSS(sampler2D shadowMap, vec4 coords){
+  vec2 uv = coords.xy / coords.w;
+  uv = uv * 0.5 + 0.5;
+
+  float zReceiver = 0.5 * coords.z + 0.5;
 
   // STEP 1: avgblocker depth
+  float zBlocker = findBlocker(shadowMap, uv, zReceiver);
+  if (zBlocker == zReceiver) return 1.0;
 
   // STEP 2: penumbra size
+  float filterSize = (zReceiver - zBlocker) * LIGHT_WIDTH_UV / zBlocker;
 
   // STEP 3: filtering
-  
-  return 1.0;
+  float visibility = 0.0;
+  poissonDiskSamples(uv);
 
+  // add a bias to prevent shadow acne
+  vec3 lightDir = normalize(uLightPos);
+  vec3 normal = normalize(vNormal);
+  float bias = max(10.0 * EPS * (1.0 - dot(normal, lightDir)), EPS);
+  
+  // filtering
+  for( int i = 0; i < PCF_NUM_SAMPLES; i++ ) {
+    // add noise to the coord
+    vec2 sample = poissonDisk[i] * filterSize + uv;
+    sample = clamp(sample, 0.0, 1.0);
+
+    // extract and unpack threshold
+    vec4 threVec = texture2D(shadowMap, sample);
+    float thre = unpack(threVec);
+
+    if (zReceiver - bias < thre) {
+      visibility += 1.0 / float(PCF_NUM_SAMPLES);
+    }
+  }
+  
+  return visibility;
 }
 
 
 float useShadowMap(sampler2D shadowMap, vec4 shadowCoord){
-  return 1.0;
+  vec3 coord = shadowCoord.xyz / shadowCoord.w;
+  coord = coord * 0.5 + 0.5;
+
+  // sample from shadowMap to get minimal depth (threshold)
+  vec4 threVec = texture2D(shadowMap, coord.xy);
+
+  // unpack to get threshold
+  float thre = unpack(threVec);
+
+  // add a bias to prevent shadow acne
+  vec3 lightDir = normalize(uLightPos);
+  vec3 normal = normalize(vNormal);
+  float bias = max(10.0 * EPS * (1.0 - dot(normal, lightDir)), EPS);
+
+  if(coord.z - bias < thre) return 1.0;
+  
+  return 0.0;
 }
 
 vec3 blinnPhong() {
@@ -134,12 +235,14 @@ vec3 blinnPhong() {
 void main(void) {
 
   float visibility;
-  //visibility = useShadowMap(uShadowMap, vec4(shadowCoord, 1.0));
-  //visibility = PCF(uShadowMap, vec4(shadowCoord, 1.0));
-  //visibility = PCSS(uShadowMap, vec4(shadowCoord, 1.0));
+  vec3 shadowCoord = vPositionFromLight.xyz;
+  
+  // visibility = useShadowMap(uShadowMap, vec4(shadowCoord, 1.0));
+  // visibility = PCF(uShadowMap, vec4(shadowCoord, 1.0));
+  visibility = PCSS(uShadowMap, vec4(shadowCoord, 1.0));
 
   vec3 phongColor = blinnPhong();
 
-  //gl_FragColor = vec4(phongColor * visibility, 1.0);
-  gl_FragColor = vec4(phongColor, 1.0);
+  gl_FragColor = vec4(phongColor * visibility, 1.0);
+  // gl_FragColor = vec4(phongColor, 1.0);
 }
