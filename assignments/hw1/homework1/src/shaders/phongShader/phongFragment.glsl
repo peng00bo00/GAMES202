@@ -237,9 +237,9 @@ void main(void) {
   float visibility;
   vec3 shadowCoord = vPositionFromLight.xyz;
   
-  // visibility = useShadowMap(uShadowMap, vec4(shadowCoord, 1.0));
+  visibility = useShadowMap(uShadowMap, vec4(shadowCoord, 1.0));
   // visibility = PCF(uShadowMap, vec4(shadowCoord, 1.0));
-  visibility = PCSS(uShadowMap, vec4(shadowCoord, 1.0));
+  // visibility = PCSS(uShadowMap, vec4(shadowCoord, 1.0));
 
   vec3 phongColor = blinnPhong();
 
