@@ -134,9 +134,9 @@ namespace ProjEnv
 
                     for (int l = 0; l < SHOrder+1; l++) {
                         for (int m = -l; m < l+1; m++) {
-                            double sh = EvalSH(l, m, dir);
+                            double sh = sh::EvalSH(l, m, dir.cast<double>());
 
-                            int idx = GetIndex(l, m);
+                            int idx = sh::GetIndex(l, m);
                             SHCoeffiecents[idx] += Le * (float)sh * sumWeight;
                         }
                     }
