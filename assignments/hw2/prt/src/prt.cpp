@@ -248,26 +248,66 @@ public:
         if (m_Type == Type::Interreflection)
         {
             // TODO: leave for bonus
-            for (int i = 0; i < mesh->getVertexCount(); i++) {
-                const Point3f &v = mesh->getVertexPositions().col(i);
-                const Normal3f &n = mesh->getVertexNormals().col(i);
+            // Eigen::MatrixXf m_TransportSHCoeffs_DI, m_TransportSHCoeffs_DI_prev;
 
-                auto shFunc = [&](double phi, double theta) -> double {
-                    Eigen::Array3d d = sh::ToVector(phi, theta);
-                    const auto wi = Vector3f(d.x(), d.y(), d.z());
+            Eigen::MatrixXf m_TransportSHCoeffs_DI_prev = m_TransportSHCoeffs;
+            Eigen::MatrixXf m_TransportSHCoeffs_DI = Eigen::MatrixXf::Zero(SHCoeffLength, mesh->getVertexCount());
 
-                    return 0.0;
-                };
+            for (int k = 0; k < m_Bounce; k++) {
+                
+                // loop over all the vertice
+                for (int i = 0; i < mesh->getVertexCount(); i++) {
+                    const Point3f &v = mesh->getVertexPositions().col(i);
+                    const Normal3f &n = mesh->getVertexNormals().col(i);
 
-                // solve for LDI
-                auto shCoeffDI = sh::ProjectFunction(SHOrder, shFunc, m_SampleCount);
+                    const int sample_side = static_cast<int>(floor(sqrt(m_SampleCount)));
+                    double weight = 4.0 * M_PI / (sample_side * sample_side);
+
+                    double phi, theta;
+                    sh::ToSphericalCoords(n.cast<double>(), &phi, &theta);
+
+                    for (int t = 0; t < sample_side; t++) {
+                        for (int p = 0; p < sample_side; p++) {
+                            double alpha= 1.0 * t / sample_side;
+                            double beta = 1.0 * p / sample_side;
+
+                            double dphi = 2.0 * M_PI * beta;
+                            double dtheta = acos(2.0 * alpha - 1.0);
+
+                            // fire a ray
+                            Eigen::Array3d d = sh::ToVector(phi+dphi, theta+dtheta);
+                            const auto wi = Vector3f(d.x(), d.y(), d.z());
+
+                            double Ldi = n.dot(wi);
+
+                            if (Ldi > 0.0) {
+                                Ray3f ray(v, wi);
+                                Intersection its;
+
+                                if (scene->rayIntersect(ray, its)) {
+                                    Eigen::VectorXf shCoeff_DI = Eigen::VectorXf(SHCoeffLength).setZero();
+
+                                    for (int j = 0; j < 3; j++) {
+                                        int idx = its.tri_index[j];
+                                        float bary = its.bary[j];
+                                        
+                                        shCoeff_DI += m_TransportSHCoeffs_DI_prev.col(idx) * bary;
+                                    }
+                                    
+                                    m_TransportSHCoeffs_DI.col(i) += shCoeff_DI * Ldi * weight;
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // update LT
-                for (int j = 0; j < shCoeffDI->size(); j++)
-                {
-                    m_TransportSHCoeffs.col(i).coeffRef(j) += (*shCoeffDI)[j];
-                }
+                m_TransportSHCoeffs += m_TransportSHCoeffs_DI;
+                
+                m_TransportSHCoeffs_DI_prev = m_TransportSHCoeffs_DI;
+                m_TransportSHCoeffs_DI.setZero();
             }
+
         }
 
         // Save in face format
