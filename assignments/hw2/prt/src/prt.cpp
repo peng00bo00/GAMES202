@@ -248,7 +248,6 @@ public:
         if (m_Type == Type::Interreflection)
         {
             // TODO: leave for bonus
-            // Eigen::MatrixXf m_TransportSHCoeffs_DI, m_TransportSHCoeffs_DI_prev;
 
             Eigen::MatrixXf m_TransportSHCoeffs_DI_prev = m_TransportSHCoeffs;
             Eigen::MatrixXf m_TransportSHCoeffs_DI = Eigen::MatrixXf::Zero(SHCoeffLength, mesh->getVertexCount());
@@ -260,44 +259,48 @@ public:
                     const Point3f &v = mesh->getVertexPositions().col(i);
                     const Normal3f &n = mesh->getVertexNormals().col(i);
 
-                    const int sample_side = static_cast<int>(floor(sqrt(m_SampleCount)));
-                    double weight = 1.0 / (sample_side * sample_side);
+                    auto shFunc = [&](double phi, double theta) -> double {
+                        Eigen::Array3d d = sh::ToVector(phi, theta);
+                        const auto wi = Vector3f(d.x(), d.y(), d.z());
+                        
+                        double Ldi = n.dot(wi);
+                        if (Ldi > 0.0) {
+                            Ray3f ray(v, wi);
+                            Intersection its;
 
-                    double phi, theta;
-                    sh::ToSphericalCoords(n.cast<double>(), &phi, &theta);
+                            if (scene->rayIntersect(ray, its)) {
+                                Eigen::VectorXf shCoeff_DI = Eigen::VectorXf(SHCoeffLength).setZero();
 
-                    for (int t = 0; t < sample_side; t++) {
-                        for (int p = 0; p < sample_side; p++) {
-                            double alpha= 1.0 * t / sample_side;
-                            double beta = 1.0 * p / sample_side;
+                                // interpolate shCoeff
+                                for (int j = 0; j < 3; j++) {
+                                    int idx = its.tri_index[j];
+                                    float bary = its.bary[j];
 
-                            double dphi = 2.0 * M_PI * beta;
-                            double dtheta = acos(2.0 * alpha - 1.0);
-
-                            // fire a ray
-                            Eigen::Array3d d = sh::ToVector(phi+dphi, theta+dtheta);
-                            const auto wi = Vector3f(d.x(), d.y(), d.z());
-
-                            double Ldi = n.dot(wi);
-
-                            if (Ldi > 0.0) {
-                                Ray3f ray(v, wi);
-                                Intersection its;
-
-                                if (scene->rayIntersect(ray, its)) {
-                                    Eigen::VectorXf shCoeff_DI = Eigen::VectorXf(SHCoeffLength).setZero();
-
-                                    for (int j = 0; j < 3; j++) {
-                                        int idx = its.tri_index[j];
-                                        float bary = its.bary[j];
-                                        
-                                        shCoeff_DI += m_TransportSHCoeffs_DI_prev.col(idx) * bary;
-                                    }
-                                    
-                                    m_TransportSHCoeffs_DI.col(i) += shCoeff_DI * Ldi * weight;
+                                    shCoeff_DI += m_TransportSHCoeffs_DI_prev.col(idx) * bary;
                                 }
+
+                                // reconstruct light
+                                double L = 0.0;
+                                for (int l = 0; l < SHOrder+1; l++) {
+                                    for (int m = -l; m < l+1; m++) {
+                                        double sh = sh::EvalSH(l, m, phi, theta);
+
+                                        int idx = sh::GetIndex(l, m);
+                                        L += sh * shCoeff_DI[idx];
+                                    }
+                                }
+
+                                return L * Ldi;
                             }
                         }
+
+                        return 0.0;
+                    };
+
+                    auto shCoeff = sh::ProjectFunction(SHOrder, shFunc, m_SampleCount);
+                    for (int j = 0; j < shCoeff->size(); j++)
+                    {
+                        m_TransportSHCoeffs_DI.col(i).coeffRef(j) = (*shCoeff)[j];
                     }
                 }
 
