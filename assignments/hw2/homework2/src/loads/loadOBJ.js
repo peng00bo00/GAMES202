@@ -59,11 +59,7 @@ function loadOBJ(renderer, path, name, objMaterial, transform) {
 									break;
 								// TODO: Add your PRTmaterial here
 								case 'PRTMaterial':
-									console.log("Using PRTMaterial!");
-									
-									console.log("guiParams", guiParams.envmapId);
 									material = buildPRTMaterial("./src/shaders/prtShader/prtVertex.glsl", "./src/shaders/prtShader/prtFragment.glsl");
-									console.log("PRTMaterial is loaded!");
 									break;
 
 								case 'SkyBoxMaterial':

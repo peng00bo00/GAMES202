@@ -6,9 +6,9 @@
 
     <!-- Render the visible surface normals -->
     <integrator type="prt">
-		<string name="type" value="interreflection" />
+		<string name="type" value="shadowed" />
 		<integer name="bounce" value="1" />
-		<integer name="PRTSampleCount" value="100" />
+		<integer name="PRTSampleCount" value="400" />
 		<string name="cubemap" value="cubemap/Indoor" />
 	</integrator>
 

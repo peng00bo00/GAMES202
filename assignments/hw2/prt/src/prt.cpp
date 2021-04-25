@@ -261,7 +261,7 @@ public:
                     const Normal3f &n = mesh->getVertexNormals().col(i);
 
                     const int sample_side = static_cast<int>(floor(sqrt(m_SampleCount)));
-                    double weight = 4.0 * M_PI / (sample_side * sample_side);
+                    double weight = 1.0 / (sample_side * sample_side);
 
                     double phi, theta;
                     sh::ToSphericalCoords(n.cast<double>(), &phi, &theta);

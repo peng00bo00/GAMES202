@@ -3,6 +3,7 @@ let precomputeL = [];
 var cameraPosition = [50, 0, 100];
 
 var envmap = [
+	'assets/cubemap/CornellBox',
 	'assets/cubemap/GraceCathedral',
 	'assets/cubemap/Indoor',
 	'assets/cubemap/Skybox',
@@ -113,9 +114,6 @@ async function GAMES202Main() {
 		}
 	}
 
-	console.log("precomputeL", precomputeL);
-	console.log("precomputeLT", precomputeLT);
-
 	// TODO: load model - Add your Material here
 	loadOBJ(renderer, 'assets/mary/', 'mary', 'PRTMaterial', box2Transform);
 	// loadOBJ(renderer, 'assets/bunny/', 'bunny', 'addYourPRTMaterial', box2Transform);
@@ -123,7 +121,7 @@ async function GAMES202Main() {
 	function createGUI() {
 		const gui = new dat.gui.GUI();
 		const panelModel = gui.addFolder('Switch Environemtn Map');
-		panelModel.add(guiParams, 'envmapId', { 'GraceGathedral': 0, 'Indoor': 1, 'Skybox': 2 }).name('Envmap Name');
+		panelModel.add(guiParams, 'envmapId', { 'CornellBox': 0, 'GraceGathedral': 1, 'Indoor': 2, 'Skybox': 3 }).name('Envmap Name');
 		panelModel.open();
 	}
 

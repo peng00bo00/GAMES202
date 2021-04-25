@@ -1,20 +1,16 @@
 class PRTMaterial extends Material {
     constructor(vertexShader, fragmentShader) {
-        let precomputeLR = mat3.create();
-        let precomputeLG = mat3.create();
-        let precomputeLB = mat3.create();
-        
 
-        for (let i = 0; i < 9; i++) {
-            precomputeLR[i] = precomputeL[guiParams.envmapId][i][0];
-            precomputeLG[i] = precomputeL[guiParams.envmapId][i][1];
-            precomputeLB[i] = precomputeL[guiParams.envmapId][i][2];
-        }
+        let colorMat3 = getMat3ValueFromRGB(precomputeL[guiParams.envmapId]);
+
+        let precomputeLR = colorMat3[0];
+        let precomputeLG = colorMat3[1];
+        let precomputeLB = colorMat3[2];
 
         super({
-            'uPrecomputeLR': { type: 'matrix3fv', value: precomputeLR },
-            'uPrecomputeLG': { type: 'matrix3fv', value: precomputeLG },
-            'uPrecomputeLB': { type: 'matrix3fv', value: precomputeLB },
+            'uPrecomputeLR': { type: 'precomputeL', value: precomputeLR },
+            'uPrecomputeLG': { type: 'precomputeL', value: precomputeLG },
+            'uPrecomputeLB': { type: 'precomputeL', value: precomputeLB },
         
         }, ['aPrecomputeLT'], vertexShader, fragmentShader, null);
     }

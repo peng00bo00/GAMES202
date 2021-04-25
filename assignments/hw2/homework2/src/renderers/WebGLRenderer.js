@@ -50,7 +50,7 @@ class WebGLRenderer {
                 for (let k in this.meshes[i].material.uniforms) {
 
                     let cameraModelMatrix = mat4.create();
-                    //mat4.fromRotation(cameraModelMatrix, timer, [0, 1, 0]);
+                    mat4.fromRotation(cameraModelMatrix, timer, [0, 1, 0]);
 
                     if (k == 'uMoveWithCamera') { // The rotation of the skybox
                         gl.uniformMatrix4fv(
@@ -60,8 +60,40 @@ class WebGLRenderer {
                     }
 
                     // Bonus - Fast Spherical Harmonic Rotation
-                    //let precomputeL_RGBMat3 = getRotationPrecomputeL(precomputeL[guiParams.envmapId], cameraModelMatrix);
-                    
+                    let precomputeL_RGBMat3 = getRotationPrecomputeL(precomputeL[guiParams.envmapId], cameraModelMatrix);
+
+                    if (k == 'uPrecomputeLR') {
+                        let precomputeLR = mat3.fromValues(precomputeL_RGBMat3[0][0], precomputeL_RGBMat3[0][1], precomputeL_RGBMat3[0][2],
+                                                            precomputeL_RGBMat3[0][3], precomputeL_RGBMat3[0][4], precomputeL_RGBMat3[0][5],
+                                                            precomputeL_RGBMat3[0][6], precomputeL_RGBMat3[0][7], precomputeL_RGBMat3[0][8]);
+
+                        gl.uniformMatrix3fv(
+                            this.meshes[i].shader.program.uniforms[k],
+                            false,
+                            precomputeLR);
+                    }
+
+                    if (k == 'uPrecomputeLG') {
+                        let precomputeLG = mat3.fromValues(precomputeL_RGBMat3[1][0], precomputeL_RGBMat3[1][1], precomputeL_RGBMat3[1][2],
+                                                            precomputeL_RGBMat3[1][3], precomputeL_RGBMat3[1][4], precomputeL_RGBMat3[1][5],
+                                                            precomputeL_RGBMat3[1][6], precomputeL_RGBMat3[1][7], precomputeL_RGBMat3[1][8]);
+
+                        gl.uniformMatrix3fv(
+                            this.meshes[i].shader.program.uniforms[k],
+                            false,
+                            precomputeLG);
+                    }
+
+                    if (k == 'uPrecomputeLB') {
+                        let precomputeLB = mat3.fromValues(precomputeL_RGBMat3[2][0], precomputeL_RGBMat3[2][1], precomputeL_RGBMat3[2][2],
+                                                            precomputeL_RGBMat3[2][3], precomputeL_RGBMat3[2][4], precomputeL_RGBMat3[2][5],
+                                                            precomputeL_RGBMat3[2][6], precomputeL_RGBMat3[2][7], precomputeL_RGBMat3[2][8]);
+
+                        gl.uniformMatrix3fv(
+                            this.meshes[i].shader.program.uniforms[k],
+                            false,
+                            precomputeLB);
+                    }
                     
                 }
 
