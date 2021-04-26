@@ -158,10 +158,74 @@ return 0.0;
 补充完代码后在`scenes/prt.xml`文件中将`type`类型设置为`interreflection`，调用`./nori.exe scenes/prt.xml`即可获得光线进行一次弹射的模型图片如下。对比Shadowed情况，可以明显发现考虑光线弹射后模型整体（尤其是头部和裙子）变亮了。
 
 <div align=center>
-<img src="images/PRT_Interreflection.png">
+<img src="images/PRT_InterRef.png">
 </div>
 
 ## PRT材质
+
+完成预计算环境光照和光线运输后回到WebGL框架进行渲染。首先需要定义PRT材质，在`./src/materials`内新建材质`PRTMaterial.js`:
+
+```js
+class PRTMaterial extends Material {
+    constructor(vertexShader, fragmentShader) {
+
+        let colorMat3 = getMat3ValueFromRGB(precomputeL[guiParams.envmapId]);
+
+        let precomputeLR = colorMat3[0];
+        let precomputeLG = colorMat3[1];
+        let precomputeLB = colorMat3[2];
+
+        super({
+            'uPrecomputeLR': { type: 'precomputeL', value: precomputeLR },
+            'uPrecomputeLG': { type: 'precomputeL', value: precomputeLG },
+            'uPrecomputeLB': { type: 'precomputeL', value: precomputeLB },
+        
+        }, ['aPrecomputeLT'], vertexShader, fragmentShader, null);
+    }
+
+}
+
+async function buildPRTMaterial(vertexPath, fragmentPath) {
+
+    let vertexShader = await getShaderString(vertexPath);
+    let fragmentShader = await getShaderString(fragmentPath);
+
+    return new PRTMaterial(vertexShader, fragmentShader);
+
+}
+```
+
+这里PRT材质包括3个通道的环境光项`uPrecomputeLR`、`uPrecomputeLG`和`uPrecomputeLB`，以及顶点的光线运输项`aPrecomputeLT`。然后定义材质所需的shader，在`./src/shaders`中新建文件夹`prtShader`并添加shader文件`prtVertex.glsl`以及`prtFragment.glsl`。其中顶点着色器`prtVertex.glsl`定义为:
+
+```glsl
+void main(void) {
+
+    vFragPos = (uModelMatrix * vec4(aVertexPosition, 1.0)).xyz;
+    vNormal = (uModelMatrix * vec4(aNormalPosition, 0.0)).xyz;
+
+    gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix *
+                  vec4(aVertexPosition, 1.0);
+
+    vColor = vec3(cwiseProdSum(uPrecomputeLR, aPrecomputeLT),
+                  cwiseProdSum(uPrecomputeLG, aPrecomputeLT),
+                  cwiseProdSum(uPrecomputeLB, aPrecomputeLT)
+                  );
+}
+```
+
+顶点着色器首先计算顶点的位置，然后将顶点颜色记录到`vColor`中。其中RGB各个通道的颜色为环境光与光线运输对应球谐系数的乘积并求和。然后是片元着色器`prtFragment.glsl`:
+
+```glsl
+void main(void) {
+    gl_FragColor = vec4(vColor, 1.0);
+}
+```
+
+片元着色器比较简单，只需将`vColor`转换为颜色的格式即可。最后运行框架即可获得环境光照下的模型渲染如下图所示，其他环境光下的渲染结果可参见`./images`。
+
+<div align=center>
+<img src="images/PRT_InterRef_Indoor.png">
+</div>
 
 ## Bonus 2: SH 旋转
 
