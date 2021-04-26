@@ -221,7 +221,7 @@ void main(void) {
 }
 ```
 
-片元着色器比较简单，只需将`vColor`转换为颜色的格式即可。最后运行框架即可获得环境光照下的模型渲染如下图所示，其他环境光下的渲染结果可参见`./images`。
+片元着色器比较简单，只需将`vColor`转换为颜色输出的格式即可。最后运行框架即可获得环境光照下的模型渲染如下图所示，其他环境光下的渲染结果可参见`./images`。
 
 <div align=center>
 <img src="images/PRT_InterRef_Indoor.png">
@@ -229,4 +229,150 @@ void main(void) {
 
 ## Bonus 2: SH 旋转
 
+利用球谐函数的旋转性质可以实现旋转光源情况下的实时渲染。具体地，对于任意band下的球谐系数其旋转前后只相差一个线性变换，且不同band间的系数互不影响。因此可以使用一个矩阵$M$来描述球谐系数的变换:
+
+$$ M P(n) = P(R(n)) $$
+
+其中，$P(n)$为某一band下旋转前的球谐系数，$P(R(n))$为旋转后的系数。因此对于第$l$阶的球谐系数只需要选取$2l+1$个方向进行旋转并构造求解线性方程组即可。以$l=1$为例，计算求解$M$矩阵的代码可参见`./src/utils/tools.js`中`computeSquareMatrix_3by3`函数：
+
+```js
+function computeSquareMatrix_3by3(rotationMatrix){ // 计算方阵SA(-1) 3*3 
+	
+	// 1、pick ni - {ni}
+	let n1 = [1, 0, 0, 0]; let n2 = [0, 0, 1, 0]; let n3 = [0, 1, 0, 0];
+
+	// 2、{P(ni)} - A  A_inverse
+	let N = math.zeros(3, 3);
+	for (let i = 0; i < 3; i++) {
+		N.subset(math.index(i, 0), n1[i]);
+		N.subset(math.index(i, 1), n2[i]);
+		N.subset(math.index(i, 2), n3[i]);
+	}
+
+	// project vector to SH
+	let P1 = SHEval(n1[0], n1[1], n1[2], 3);
+	let P2 = SHEval(n2[0], n2[1], n2[2], 3);
+	let P3 = SHEval(n3[0], n3[1], n3[2], 3);
+
+	let A = math.zeros(3, 3);
+	for (let i = 0; i < 3; i++) {
+		A.subset(math.index(i, 0), P1[i+1]);
+		A.subset(math.index(i, 1), P2[i+1]);
+		A.subset(math.index(i, 2), P3[i+1]);
+	}
+
+	let A_inv = math.inv(A);
+
+	// 3、用 R 旋转 ni - {R(ni)}
+	let R = mat4Matrix2mathMatrix(rotationMatrix);
+	R = R.subset(math.index(math.range(0, 3), math.range(0, 3)));
+
+	let Rn= math.multiply(math.transpose(R), N);
+
+	// 4、R(ni) SH投影 - S
+	// project rotated vector to SH
+	let PR1 = SHEval(Rn.subset(math.index(0, 0)), Rn.subset(math.index(1, 0)), Rn.subset(math.index(2, 0)), 3);
+	let PR2 = SHEval(Rn.subset(math.index(0, 1)), Rn.subset(math.index(1, 1)), Rn.subset(math.index(2, 1)), 3);
+	let PR3 = SHEval(Rn.subset(math.index(0, 2)), Rn.subset(math.index(1, 2)), Rn.subset(math.index(2, 2)), 3);
+
+	let S = math.zeros(3, 3);
+	for (let i = 0; i < 3; i++) {
+		S.subset(math.index(i, 0), PR1[i+1]);
+		S.subset(math.index(i, 1), PR2[i+1]);
+		S.subset(math.index(i, 2), PR3[i+1]);
+	}
+
+	// 5、S*A_inverse
+	let M = math.multiply(S, A_inv);
+
+	return M;
+}
+```
+
+类似地，完成$l=2$时计算$M$矩阵的函数`computeSquareMatrix_5by5`。然后即可实现对环境光球谐系数的旋转函数`getRotationPrecomputeL`:
+
+```js
+function getRotationPrecomputeL(precompute_L, rotationMatrix){
+	let result = [];
+
+	let M = math.identity(9);
+
+	// 3 by 3
+	let M3 = computeSquareMatrix_3by3(rotationMatrix);
+	M.subset(math.index(math.range(1, 4), math.range(1, 4)), M3);
+
+	// 5 by 5
+	let M5 = computeSquareMatrix_5by5(rotationMatrix);
+	M.subset(math.index(math.range(4, 9), math.range(4, 9)), M5);
+
+	for(var i = 0; i<3; i++) {
+		let L = [precompute_L[0][i], precompute_L[1][i], precompute_L[2][i],
+				 precompute_L[3][i], precompute_L[4][i], precompute_L[5][i],
+				 precompute_L[6][i], precompute_L[7][i], precompute_L[8][i]];
+		
+		let vecL = math.matrix(L);
+
+		let ML = math.multiply(M, vecL);
+		ML = ML.reshape([9]);
+		
+		result[i] = [ML.subset(math.index(0)), ML.subset(math.index(1)), ML.subset(math.index(2)),
+					ML.subset(math.index(3)), ML.subset(math.index(4)), ML.subset(math.index(5)),
+					ML.subset(math.index(6)), ML.subset(math.index(7)), ML.subset(math.index(8)),];
+	}
+
+	return result;
+}
+```
+
+最后在`./src/renderers/WebGLRenderer.js`中添加更新环境光的代码:
+
+```js
+// Bonus - Fast Spherical Harmonic Rotation
+let precomputeL_RGBMat3 = getRotationPrecomputeL(precomputeL[guiParams.envmapId], cameraModelMatrix);
+
+if (k == 'uPrecomputeLR') {
+    let precomputeLR = mat3.fromValues(precomputeL_RGBMat3[0][0], precomputeL_RGBMat3[0][1], precomputeL_RGBMat3[0][2],
+                                        precomputeL_RGBMat3[0][3], precomputeL_RGBMat3[0][4], precomputeL_RGBMat3[0][5],
+                                        precomputeL_RGBMat3[0][6], precomputeL_RGBMat3[0][7], precomputeL_RGBMat3[0][8]);
+
+    gl.uniformMatrix3fv(
+        this.meshes[i].shader.program.uniforms[k],
+        false,
+        precomputeLR);
+    }
+
+if (k == 'uPrecomputeLG') {
+    let precomputeLG = mat3.fromValues(precomputeL_RGBMat3[1][0], precomputeL_RGBMat3[1][1], precomputeL_RGBMat3[1][2],
+                                        precomputeL_RGBMat3[1][3], precomputeL_RGBMat3[1][4], precomputeL_RGBMat3[1][5],
+                                        precomputeL_RGBMat3[1][6], precomputeL_RGBMat3[1][7], precomputeL_RGBMat3[1][8]);
+
+    gl.uniformMatrix3fv(
+        this.meshes[i].shader.program.uniforms[k],
+        false,
+        precomputeLG);
+    }
+
+if (k == 'uPrecomputeLB') {
+    let precomputeLB = mat3.fromValues(precomputeL_RGBMat3[2][0], precomputeL_RGBMat3[2][1], precomputeL_RGBMat3[2][2],
+                                        precomputeL_RGBMat3[2][3], precomputeL_RGBMat3[2][4], precomputeL_RGBMat3[2][5],
+                                        precomputeL_RGBMat3[2][6], precomputeL_RGBMat3[2][7], precomputeL_RGBMat3[2][8]);
+
+    gl.uniformMatrix3fv(
+        this.meshes[i].shader.program.uniforms[k],
+        false,
+        precomputeLB);
+    }
+```
+
+开启环境光旋转后进行录制得到动画如下：
+
+<div align=center>
+<img src="images/PRT_Rotation_CornellBox.gif">
+<img src="images/PRT_Rotation_GraceCathedral.gif">
+</div>
+
 ## Reference
+
+* [Precomputation-Based Rendering](https://cseweb.ucsd.edu/~ravir/prtsurvey.pdf)
+* [A Gentle Introduction to Precomputed Radiance Transfer](https://www.inf.ufrgs.br/~oliveira/pubs_files/Slomp_Oliveira_Patricio-Tutorial-PRT.pdf)
+* [Spherical Harmonic Lighting: The Gritty Details](http://www.cse.chalmers.se/~uffe/xjobb/Readings/GlobalIllumination/Spherical%20Harmonic%20Lighting%20-%20the%20gritty%20details.pdf)
