@@ -1,3 +1,5 @@
+*.driveupload
+
 # vscode
 .vscode/*
 !.vscode/settings.json
