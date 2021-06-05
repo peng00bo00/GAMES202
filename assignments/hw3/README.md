@@ -41,7 +41,11 @@ vec3 EvalDirectionalLight(vec2 uv) {
 完成以上两个函数后进行渲染得到直接光照下的场景如下图：
 
 <div align=center>
-<img src="images/Cube_dir.png">
+<img src="images/Cube1_dir.png">
+</div>
+
+<div align=center>
+<img src="images/Cube2_dir.png">
 </div>
 
 <div align=center>
@@ -130,7 +134,11 @@ if (hit) {
 最后将全部间接光照项求平均即可得到最终的间接光照项，代码可参见`./src/shaders/ssrShader/ssrFragment.glsl`。将间接光照和直接光照相加即可得到最终的全局光照效果，如下图所示：
 
 <div align=center>
-<img src="images/Cube.png">
+<img src="images/Cube1.png">
+</div>
+
+<div align=center>
+<img src="images/Cube2.png">
 </div>
 
 <div align=center>
