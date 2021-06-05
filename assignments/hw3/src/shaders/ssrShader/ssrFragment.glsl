@@ -125,9 +125,9 @@ vec3 EvalDiffuse(vec3 wi, vec3 wo, vec2 uv) {
   vec3 L = vec3(0.0);
 
   vec3 diffuse = GetGBufferDiffuse(uv);
-  vec3 normal = GetGBufferNormalWorld(uv);
+  vec3 normal = normalize(GetGBufferNormalWorld(uv));
 
-  L = INV_PI * diffuse * max(dot(wo, normal), 0.0);
+  L = INV_PI * diffuse * max(dot(wi, normal), 0.0);
 
   return L;
 }
@@ -155,7 +155,7 @@ bool raymarch(vec3 hitPos, out bool flag) {
     flag = true;
   }
 
-  if(flag && depth - thre < 0.1) {
+  if(abs(depth - thre) < 1e-2) {
     return true;
   }
 
@@ -163,8 +163,9 @@ bool raymarch(vec3 hitPos, out bool flag) {
 }
 
 bool RayMarch(vec3 ori, vec3 dir, out vec3 hitPos) {
-  float step = 0.1;
-  for(int i = 0; i < 200; i++) {
+  float step = 1.0;
+
+  for(int i = 0; i < 100; i++) {
     bool flag = false;
     
     if(step > 100.0) {
@@ -178,7 +179,7 @@ bool RayMarch(vec3 ori, vec3 dir, out vec3 hitPos) {
     }
 
     if(flag) {
-      step = step * 0.9;
+      step = step * 0.5;
     }
     else {
       step = step * 1.5;
@@ -196,7 +197,7 @@ void main() {
   vec3 L = vec3(0.0);
   // L = GetGBufferDiffuse(GetScreenCoordinate(vPosWorld.xyz));
 
-  vec3 wi = normalize(-uLightDir);
+  vec3 wi = normalize(uLightDir);
   vec3 wo = normalize(uCameraPos - vPosWorld.xyz);
 
   vec2 uv = GetScreenCoordinate(vPosWorld.xyz);
@@ -205,7 +206,7 @@ void main() {
   vec3 Li = EvalDirectionalLight(uv);
 
   // direct light
-  L = Li * fr;
+  L = fr * Li;
 
   // local coordinate to world coordinate
   vec3 b1, b2;
@@ -213,23 +214,26 @@ void main() {
   LocalBasis(n, b1, b2);
   mat3 R = mat3(0.0);
 
-  R[0] = n;
-  R[1] = b1;
-  R[2] = b2;
+  R[0] = b1;
+  R[1] = b2;
+  R[2] = n;
 
   // indirect light
   vec3 L_indir = vec3(0.0);
   for(int i = 0; i < SAMPLE_NUM; i++) {
     vec3 hitPos = vPosWorld.xyz;
 
+    // sample a direction
     float pdf;
     vec3 dir = SampleHemisphereUniform(s, pdf);
+    // vec3 dir = SampleHemisphereCos(s, pdf);
 
     dir = R * dir;
 
+    // march from current point
     bool hit = RayMarch(vPosWorld.xyz, dir, hitPos);
 
-    if(hit) {
+    if (hit) {
       vec2 uv1 = GetScreenCoordinate(hitPos);
       L_indir = L_indir + EvalDiffuse(dir, wo, uv) / pdf * EvalDiffuse(wi, -dir, uv1) * EvalDirectionalLight(uv1);
     }
