@@ -228,6 +228,7 @@ void main() {
     vec3 dir = SampleHemisphereUniform(s, pdf);
     // vec3 dir = SampleHemisphereCos(s, pdf);
 
+    // local coordinate to world coordinate
     dir = R * dir;
 
     // march from current point
