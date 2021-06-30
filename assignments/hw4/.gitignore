@@ -31,5 +31,5 @@
 *.out
 *.app
 
-/build
+*/build
 !GGX_E_MC_LUT.png

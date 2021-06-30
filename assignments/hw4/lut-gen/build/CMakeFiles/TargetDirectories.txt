@@ -1,6 +1,0 @@
-/home/pengbo/GAMES202/assignments/hw4/lut-gen/build/CMakeFiles/rebuild_cache.dir
-/home/pengbo/GAMES202/assignments/hw4/lut-gen/build/CMakeFiles/lut-Eavg-IS.dir
-/home/pengbo/GAMES202/assignments/hw4/lut-gen/build/CMakeFiles/lut-Emu-IS.dir
-/home/pengbo/GAMES202/assignments/hw4/lut-gen/build/CMakeFiles/lut-Eavg-MC.dir
-/home/pengbo/GAMES202/assignments/hw4/lut-gen/build/CMakeFiles/edit_cache.dir
-/home/pengbo/GAMES202/assignments/hw4/lut-gen/build/CMakeFiles/lut-Emu-MC.dir
