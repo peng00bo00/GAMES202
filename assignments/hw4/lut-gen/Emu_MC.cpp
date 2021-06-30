@@ -80,7 +80,7 @@ Vec3f IntegrateBRDF(Vec3f V, float roughness, float NdotV) {
     const int sample_count = 1024;
     Vec3f N = Vec3f(0.0, 0.0, 1.0);
 
-    const float R0 = 1.0 - 0.04;
+    const float R0 = 1.0;
     
     samplePoints sampleList = squareToCosineHemisphere(sample_count);
     for (int i = 0; i < sample_count; i++) {
