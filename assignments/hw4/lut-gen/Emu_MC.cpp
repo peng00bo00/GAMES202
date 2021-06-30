@@ -91,11 +91,13 @@ Vec3f IntegrateBRDF(Vec3f V, float roughness, float NdotV) {
         float NdotL = dot(N, L);
         Vec3f H = normalize(L + V);
 
-        float F = R0 + (1.0 - R0) * pow(NdotV, 5);
+        float F = R0 + (1.0 - R0) * pow(1-NdotV, 5);
         float D = DistributionGGX(N, H, roughness);
         float G = GeometrySmith(roughness, NdotV, NdotL);
 
-        float f = F * D * G / (4 * NdotL);
+        // fr = F * D * G / (4 * NdotL * NdotV)
+        // E(mu) += fr * NdotL / pdf
+        float f = F * D * G / (4 * NdotV);
 
         A += f / pdf;
     }
