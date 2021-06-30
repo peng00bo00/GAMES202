@@ -88,7 +88,7 @@ Vec3f IntegrateBRDF(Vec3f V, float roughness, float NdotV) {
         Vec3f L = sampleList.directions[i];
         float pdf= sampleList.PDFs[i];
 
-        float NdotL = dot(N, L);
+        float NdotL = std::max(dot(N, L), 0.0f);
         Vec3f H = normalize(L + V);
 
         float F = R0 + (1.0 - R0) * pow(1-NdotV, 5);

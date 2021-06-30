@@ -31,5 +31,7 @@
 *.out
 *.app
 
+*/.vscode
+
 */build/*
 !*/build/GGX_E_MC_LUT.png
