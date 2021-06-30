@@ -35,3 +35,5 @@
 
 */build/*
 !*/build/GGX_E_MC_LUT.png
+!*/build/GGX_Eavg_LUT.png
+!*/build/GGX_E_LUT.png

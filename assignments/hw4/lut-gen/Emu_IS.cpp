@@ -27,23 +27,39 @@ Vec3f ImportanceSampleGGX(Vec2f Xi, Vec3f N, float roughness) {
     float a = roughness * roughness;
 
     //TODO: in spherical space - Bonus 1
-
+    float cosTheta = sqrt((1.0f - Xi.y) / (1.0f + (a*a - 1.0f) * Xi.y));
+    float sinTheta = sqrt(1.0f - cosTheta * cosTheta);
+    float phi = 2.0f * M_PI * Xi.x;
 
     //TODO: from spherical space to cartesian space - Bonus 1
- 
+    Vec3f H;
+    H.x = cos(phi) * sinTheta;
+    H.y = sin(phi) * sinTheta;
+    H.z = cosTheta;
 
     //TODO: tangent coordinates - Bonus 1
+    Vec3f up, T, B;
 
+    up= abs(N.z) < 0.999f ? Vec3f(0.0f, 0.0f, 1.0f) : Vec3f(1.0f, 0.0f, 0.0f);
+    T = normalize(cross(up, N));
+    B = cross(N, T);
 
     //TODO: transform H to tangent space - Bonus 1
+    H = T * H.x + B * H.y + N * H.z;
+    H = normalize(H);
     
-    return Vec3f(1.0f);
+    return H;
 }
 
 float GeometrySchlickGGX(float NdotV, float roughness) {
     // TODO: To calculate Schlick G1 here - Bonus 1
-    
-    return 1.0f;
+    float a = roughness + 1.0f;
+    float k = (a * a) / 8.0f;
+
+    float nom = NdotV;
+    float denom = NdotV * (1.0f - k) + k;
+
+    return nom / denom;
 }
 
 float GeometrySmith(float roughness, float NoV, float NoL) {
@@ -57,6 +73,10 @@ Vec3f IntegrateBRDF(Vec3f V, float roughness) {
 
     const int sample_count = 1024;
     Vec3f N = Vec3f(0.0, 0.0, 1.0);
+
+    const float R0 = 1.0;
+    float f = 0.0;
+
     for (int i = 0; i < sample_count; i++) {
         Vec2f Xi = Hammersley(i, sample_count);
         Vec3f H = ImportanceSampleGGX(Xi, N, roughness);
@@ -68,13 +88,17 @@ Vec3f IntegrateBRDF(Vec3f V, float roughness) {
         float NoV = std::max(dot(N, V), 0.0f);
         
         // TODO: To calculate (fr * ni) / p_o here - Bonus 1
+        float F = R0 + (1.0 - R0) * pow(1-VoH, 5);
+        float G = GeometrySmith(roughness, NoV, NoL);
+        float w = G * VoH / (NoH * NoV);
 
+        f += w * F / sample_count;
 
         // Split Sum - Bonus 2
         
     }
 
-    return Vec3f(1.0f);
+    return Vec3f(f);
 }
 
 int main() {

@@ -80,7 +80,7 @@ Vec3f IntegrateEmu(Vec3f V, float roughness, float NdotV, Vec3f Ei) {
 
         // TODO: To calculate Eavg here
         float pdf= sampleList.PDFs[i];
-        Eavg += Ei * NoL / pdf;
+        Eavg += Ei * NoL / (pdf * M_PI);
     }
 
     return Eavg / sample_count;
