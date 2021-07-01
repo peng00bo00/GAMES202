@@ -90,11 +90,10 @@ Vec3f IntegrateBRDF(Vec3f V, float roughness) {
         float NoV = std::max(dot(N, V), 0.0f);
         
         // TODO: To calculate (fr * ni) / p_o here - Bonus 1
-        float F = R0 + (1.0 - R0) * pow(1-VoH, 5);
         float G = GeometrySmith(roughness, NoV, NoL);
         float w = G * VoH / (NoH * NoV);
 
-        f += F * w / sample_count;
+        f += w / sample_count;
 
         // Split Sum - Bonus 2
         

@@ -43,9 +43,6 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 float GeometrySchlickGGX(float NdotV, float roughness)
 {
     // TODO: To calculate Smith G1 here
-    // float a = roughness;
-    // float k = (a * a) / 2.0;
-
     float a = roughness + 1.0;
     float k = (a * a) / 8.0;
 
@@ -95,7 +92,7 @@ void main(void) {
     float NDF = DistributionGGX(N, H, uRoughness);   
     float G   = GeometrySmith(N, V, L, uRoughness); 
     vec3 F = fresnelSchlick(F0, V, H);
-        
+
     vec3 numerator    = NDF * G * F; 
     float denominator = max((4.0 * NdotL * NdotV), 0.001);
     vec3 BRDF = numerator / denominator;

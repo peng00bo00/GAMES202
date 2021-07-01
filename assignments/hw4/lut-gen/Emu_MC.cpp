@@ -79,8 +79,6 @@ Vec3f IntegrateBRDF(Vec3f V, float roughness, float NdotV) {
     float C = 0.0;
     const int sample_count = 1024;
     Vec3f N = Vec3f(0.0, 0.0, 1.0);
-
-    const float R0 = 1.0;
     
     samplePoints sampleList = squareToCosineHemisphere(sample_count);
     for (int i = 0; i < sample_count; i++) {
@@ -93,13 +91,12 @@ Vec3f IntegrateBRDF(Vec3f V, float roughness, float NdotV) {
 
         float VoH = std::max(dot(V, H), 0.0f);
 
-        float F = R0 + (1.0 - R0) * pow(1-VoH, 5);
         float D = DistributionGGX(N, H, roughness);
         float G = GeometrySmith(roughness, NdotV, NdotL);
 
         // fr = F * D * G / (4 * NdotL * NdotV)
         // E(mu) += fr * NdotL / pdf
-        float f = F * D * G / (4 * NdotV);
+        float f = D * G / (4 * NdotV);
 
         A += f / pdf;
     }
