@@ -31,7 +31,7 @@ Vec3f ImportanceSampleGGX(Vec2f Xi, Vec3f N, float roughness) {
 
     // TODO: Copy the code from your previous work - Bonus 1
 
-        //TODO: in spherical space - Bonus 1
+    //TODO: in spherical space - Bonus 1
     float cosTheta = sqrt((1.0f - Xi.y) / (1.0f + (a*a - 1.0f) * Xi.y));
     float sinTheta = sqrt(1.0f - cosTheta * cosTheta);
     float phi = 2.0f * M_PI * Xi.x;
