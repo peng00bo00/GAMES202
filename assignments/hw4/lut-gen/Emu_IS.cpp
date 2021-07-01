@@ -92,7 +92,7 @@ Vec3f IntegrateBRDF(Vec3f V, float roughness) {
         float G = GeometrySmith(roughness, NoV, NoL);
         float w = G * VoH / (NoH * NoV);
 
-        f += w * F / sample_count;
+        f += F * w / sample_count;
 
         // Split Sum - Bonus 2
         
