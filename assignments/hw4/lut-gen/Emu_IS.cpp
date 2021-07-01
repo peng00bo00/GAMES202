@@ -53,8 +53,10 @@ Vec3f ImportanceSampleGGX(Vec2f Xi, Vec3f N, float roughness) {
 
 float GeometrySchlickGGX(float NdotV, float roughness) {
     // TODO: To calculate Schlick G1 here - Bonus 1
-    float a = roughness + 1.0f;
-    float k = (a * a) / 8.0f;
+    // float a = roughness + 1.0f;
+    // float k = (a * a) / 8.0f;
+    float a = roughness;
+    float k = (a * a) / 2.0f;
 
     float nom = NdotV;
     float denom = NdotV * (1.0f - k) + k;
