@@ -122,10 +122,10 @@ void main(void) {
     float NDF = DistributionGGX(N, H, uRoughness);   
     float G   = GeometrySmith(N, V, L, uRoughness);
     vec3 F = fresnelSchlick(F0, V, H);
-        
+
     vec3 numerator    = NDF * G * F; 
     float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0);
-    vec3 Fmicro = numerator / max(denominator, 0.001); 
+    vec3 Fmicro = numerator / max(denominator, 0.001);
     
     float NdotL = max(dot(N, L), 0.0);        
 
