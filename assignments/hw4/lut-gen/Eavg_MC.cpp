@@ -115,7 +115,7 @@ int main() {
 
                 Vec3f Ei = getEmu((resolution - 1 - i), j, 0, Edata, NdotV, roughness);
                 // Eavg += IntegrateEmu(V, roughness, NdotV, Ei) * step;
-                Eavg += Ei * NdotV;
+                Eavg += Ei * NdotV * step;
                 setRGB(i, j, 0.0, data);
 			}
 
