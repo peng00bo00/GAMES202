@@ -7,5 +7,5 @@ make -j8
 ./lut-Emu-MC
 ./lut-Emu-IS
 ./lut-Eavg-MC
-# ./lut-Eavg-IS
+./lut-Eavg-IS
 cd ..
