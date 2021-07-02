@@ -16,11 +16,11 @@
 $$
 \begin{aligned}
     E(\mu_0) &= \int_{0}^{2\pi} \int_{0}^{1} f_r(\mu_0, \mu_i, \phi) \mu_i d \mu_i d \phi \\
-    &= \int_{0}^{2\pi} \int_{0}^{1} \frac{F(L, H) G(L, V, H) D(H)}{4 (N \cdot V) (N \cdot L) } \mu_i d \mu_i d \phi
+    &= \int_{0}^{2\pi} \int_{0}^{1} \frac{F(i, h) G(i, o, h) D(h)}{4 (h \cdot i) (n \cdot o) } \mu_i d \mu_i d \phi
 \end{aligned}
 $$
 
-其中, $L$为入射方向，$V$为出射方向，$H$为半程向量，$N$为法向。这里取$F=1.0$，$G$和$D$的计算函数已经给出，只需完成被积函数的计算即可：
+其中, $i$为入射方向，$o$为出射方向，$h$为半程向量，$n$为法向。这里取$F=1.0$，$G$和$D$的计算函数已经给出，只需完成被积函数的计算即可：
 
 ```cpp
 for (int i = 0; i < sample_count; i++) {
@@ -93,6 +93,97 @@ Eavg += Ei * NdotV * step * 2.0;
 
 ## Bonus1 重要性采样
 
+使用均匀采样计算得到的$E(\mu)$在粗糙度较低时会产生较大的方差，这里可以使用重要性采样来缓解这个问题。已知待求解的定积分为：
+
+$$
+\begin{aligned}
+    E(\mu_0) &= \int_{\Omega} f_r \cos (\theta) d \omega \approx \frac{1}{N} \sum_{k=1}^N \frac{f_r (n \cdot i)}{p(i)}
+\end{aligned}
+$$
+
+其中，$p(i)$表示入射方向为$i$对应的概率密度。使用GGX进行采样时对应的概率密度为：
+
+$$
+\begin{aligned}
+    p(h) = D(h) (h \cdot n)
+\end{aligned}
+$$
+
+需要说明的是GGX采样得到的是法向$h$而积分变量则是入射方向$i$，因此需要将法向概率密度转换为入射方向概率密度：
+$$
+\begin{aligned}
+    p(i) = \frac{1}{4 (i \cdot h)} p(h)
+\end{aligned}
+$$
+
+代入每个样本得到求和项为：
+
+$$
+\begin{aligned}
+    \frac{f_r (n \cdot i)}{p(i)} = \frac{F(i, h) G(i, o, h) D(h) (n \cdot i)}{4 (n \cdot o) (n \cdot i) p(i)} = \frac{G(i, o, h) (o \cdot h)}{(n \cdot o) (n \cdot h)}
+\end{aligned}
+$$
+
+只需将每个样本带入上式并取平均即可。代码方面首先实现GGX采样函数`ImportanceSampleGGX()`采样得到法线方向：
+```cpp
+Vec3f ImportanceSampleGGX(Vec2f Xi, Vec3f N, float roughness) {
+    float a = roughness * roughness;
+
+    //TODO: in spherical space - Bonus 1
+    float cosTheta = sqrt((1.0f - Xi.y) / (1.0f + (a*a - 1.0f) * Xi.y));
+    float sinTheta = sqrt(1.0f - cosTheta * cosTheta);
+    float phi = 2.0f * M_PI * Xi.x;
+
+    //TODO: from spherical space to cartesian space - Bonus 1
+    Vec3f H;
+    H.x = cos(phi) * sinTheta;
+    H.y = sin(phi) * sinTheta;
+    H.z = cosTheta;
+
+    //TODO: tangent coordinates - Bonus 1
+    Vec3f up, T, B;
+
+    up= abs(N.z) < 0.999f ? Vec3f(0.0f, 0.0f, 1.0f) : Vec3f(1.0f, 0.0f, 0.0f);
+    T = normalize(cross(up, N));
+    B = cross(N, T);
+
+    //TODO: transform H to tangent space - Bonus 1
+    H = T * H.x + B * H.y + N * H.z;
+    H = normalize(H);
+    
+    return H;
+}
+```
+
+然后完成BRDF积分部分：
+```cpp
+for (int i = 0; i < sample_count; i++) {
+    Vec2f Xi = Hammersley(i, sample_count);
+    Vec3f H = ImportanceSampleGGX(Xi, N, roughness);
+    Vec3f L = normalize(H * 2.0f * dot(V, H) - V);
+
+    float NoL = std::max(L.z, 0.0f);
+    float NoH = std::max(H.z, 0.0f);
+    float VoH = std::max(dot(V, H), 0.0f);
+    float NoV = std::max(dot(N, V), 0.0f);
+        
+    // TODO: To calculate (fr * ni) / p_o here - Bonus 1
+    float G = GeometrySmith(roughness, NoV, NoL);
+    float w = G * VoH / (NoH * NoV);
+
+    f += w / sample_count;
+
+    // Split Sum - Bonus 2
+
+}
+```
+
+详细源码可参见`./lut-gen/Emu_IS.cpp`。运行`test.sh`可得到使用重要性采样预计算的$E(\mu)$如下图所示：
+
+<div align=center>
+<img src="images/GGX_E_LUT.png">
+</div>
+
 ## BRDF补偿
 
 完成预计算部分后可以实现在线端的shader。首先在`PBRFragment.glsl`和`KullaContyFragment.glsl`中补充代码实现PBR材质，相关代码可以参考`./lut-gen/Emu_MC.cpp`中已经给出的实现：
@@ -149,17 +240,23 @@ vec3 fresnelSchlick(vec3 F0, vec3 V, vec3 H)
 
 $$
 \begin{aligned}
-    f_{ms} (\mu_0, \mu_i) = \frac{(1 - E(\mu_0)) (1 - E(\mu_i))}{\pi (1 - E_{avg})}
+    f_{\text{ms}} (\mu_0, \mu_i) = \frac{(1 - E(\mu_0)) (1 - E(\mu_i))}{\pi (1 - E_{avg})}
 \end{aligned}
 $$
 
 $$
 \begin{aligned}
-    f_{add} (\mu_0, \mu_i) = \frac{F_{avg} E_{avg}}{1 - F_{avg}(1 - E_{avg})}
+    f_{\text{add}} (\mu_0, \mu_i) = \frac{F_{avg} E_{avg}}{1 - F_{avg}(1 - E_{avg})}
 \end{aligned}
 $$
 
-其中$f_{ms}$为不考虑颜色情况下的能量补偿，而$f_{add}$为考虑物体自身颜色对能量吸收的情况下最终反射出能量的比例。二者相乘即为最终的能量补偿项。
+$$
+\begin{aligned}
+    f_r = f_{\text{micro}} + f_{\text{ms}} \cdot f_{\text{add}}
+\end{aligned}
+$$
+
+其中$f_{\text{ms}}$为不考虑颜色情况下的能量补偿，而$f_{\text{add}}$为考虑物体自身颜色对能量吸收的情况下最终反射出能量的比例。二者相乘即为最终的能量补偿项。
 
 在`MultiScatterBRDF()`函数中补充代码如下：
 ```glsl
@@ -184,3 +281,12 @@ vec3 MultiScatterBRDF(float NdotL, float NdotV)
 ```
 
 最终得到PBR材质和Kulla-Conty材质的渲染结果如下图所示：
+
+<div align=center>
+<img src="images/PBRMaterial.jpg">
+</div>
+
+## Bonus2 使用Split-Sum预计算$E(\mu)$
+
+## Reference
+[Real Shading in Unreal Engine 4](https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf)
