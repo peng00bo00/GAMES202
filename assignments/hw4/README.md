@@ -97,7 +97,7 @@ Eavg += Ei * NdotV * step * 2.0;
 
 $$
 \begin{aligned}
-    E(\mu) &= \int_{\Omega} f_r \cos (\theta) d \omega \approx \frac{1}{N} \sum_{k=1}^N \frac{f_r (n \cdot i)}{p(i)}
+    E(\mu) &= \int_{\Omega} f_r \cos (\theta) d \omega \approx \frac{1}{N} \sum_{k=1}^N \frac{f_r \cdot (n \cdot i)}{p(i)}
 \end{aligned}
 $$
 
@@ -120,7 +120,7 @@ $$
 
 $$
 \begin{aligned}
-    \frac{f_r (n \cdot i)}{p(i)} = \frac{F(i, h) G(i, o, h) D(h) (n \cdot i)}{4 (n \cdot o) (n \cdot i) p(i)} = \frac{G(i, o, h) (o \cdot h)}{(n \cdot o) (n \cdot h)}
+    \frac{f_r \cdot (n \cdot i)}{p(i)} = \frac{F(i, h) G(i, o, h) D(h) (n \cdot i)}{4 (n \cdot o) (n \cdot i) p(i)} = \frac{G(i, o, h) (o \cdot h)}{(n \cdot o) (n \cdot h)}
 \end{aligned}
 $$
 
