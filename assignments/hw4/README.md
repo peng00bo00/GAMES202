@@ -347,7 +347,7 @@ Vec3f IntegrateBRDF(Vec3f V, float roughness) {
 <img src="images/GGX_E_LUT_split_sum.png">
 </div>
 
-然后在`KullaContyFragment.glsl`中修改$E(\mu_i)$和$E(\mu_o)$的计算。这里取$R_0 = 0$，因此对应的$E(\mu)$只需将纹理的RG两通道数值相加即可：
+然后在`KullaContyFragment.glsl`中修改$E(\mu_i)$和$E(\mu_o)$的计算。这里取$R_0 = 1.0$，因此对应的$E(\mu)$只需将纹理的RG两通道数值相加即可：
 
 ```glsl
 vec3 MultiScatterBRDF(float NdotL, float NdotV)
