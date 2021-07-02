@@ -4,7 +4,7 @@
 
 ## 项目描述
 
-本次作业实现了Kulla-Conty BRDF模型，主要内容包括:
+本次作业实现了Kulla-Conty材质模型，主要内容包括:
 
 - 在离线端预计算$E(\mu)$和$E_{avg}$
 - 在实时端计算BRDF的能量补偿项
@@ -97,7 +97,7 @@ Eavg += Ei * NdotV * step * 2.0;
 
 $$
 \begin{aligned}
-    E(\mu_0) &= \int_{\Omega} f_r \cos (\theta) d \omega \approx \frac{1}{N} \sum_{k=1}^N \frac{f_r (n \cdot i)}{p(i)}
+    E(\mu) &= \int_{\Omega} f_r \cos (\theta) d \omega \approx \frac{1}{N} \sum_{k=1}^N \frac{f_r (n \cdot i)}{p(i)}
 \end{aligned}
 $$
 
@@ -287,6 +287,98 @@ vec3 MultiScatterBRDF(float NdotL, float NdotV)
 </div>
 
 ## Bonus2 使用Split-Sum预计算$E(\mu)$
+
+根据Schlick近似可以将$E(\mu)$进行分解：
+
+$$
+\begin{aligned}
+    E(\mu) &= \int_{\Omega} f_r \cos (\theta) d \omega = \int_{\Omega} \frac{f_r}{F} F \cos (\theta) d \omega \\
+    &= \int_{\Omega} \frac{f_r}{F} [R_0 + (1 - R_0)(1 - v \cdot h)^5] \cos (\theta) d \omega \\
+    &= R_0 \int_{\Omega} \frac{f_r}{F} (1 - (1 - v \cdot h)^5) \cos (\theta) d \omega + \int_{\Omega} \frac{f_r}{F} (1 - v \cdot h)^5 \cos (\theta) d \omega \\
+    &= R_0 A + B
+\end{aligned}
+$$
+
+其中$R_0$为基础反射率。上式表明对于任意材质其在$\mu$方向上反射的能量等于基础反射率$R_0$乘以某个常数$A$再加上另一个常数$B$。因此可以预先将常数$A$和$B$写入纹理中，在实际渲染时通过查询纹理来计算所需的$E(\mu)$。
+
+在代码方面首先需要修改`Emu_IS.cpp`中BRDF积分的部分：
+```cpp
+Vec3f IntegrateBRDF(Vec3f V, float roughness) {
+
+    const int sample_count = 1024;
+    Vec3f N = Vec3f(0.0, 0.0, 1.0);
+
+    const float R0 = 1.0;
+    float f = 0.0;
+
+    float A = 0.0;
+    float B = 0.0;
+
+    for (int i = 0; i < sample_count; i++) {
+        Vec2f Xi = Hammersley(i, sample_count);
+        Vec3f H = ImportanceSampleGGX(Xi, N, roughness);
+        Vec3f L = normalize(H * 2.0f * dot(V, H) - V);
+
+        float NoL = std::max(L.z, 0.0f);
+        float NoH = std::max(H.z, 0.0f);
+        float VoH = std::max(dot(V, H), 0.0f);
+        float NoV = std::max(dot(N, V), 0.0f);
+        
+        // TODO: To calculate (fr * ni) / p_o here - Bonus 1
+        float G = GeometrySmith(roughness, NoV, NoL);
+        float w = G * VoH / (NoH * NoV);
+
+        // f += w / sample_count;
+
+        // Split Sum - Bonus 2
+        float Fc = pow(1.0f - VoH, 5.0);
+        A += (1 - Fc) * w / sample_count;
+        B += Fc * w / sample_count;
+    }
+
+    // return Vec3f(f);
+    return Vec3f(A, B, 0.0f);
+}
+```
+
+得到分离后的$E(\mu)$预计算结果如下：
+
+<div align=center>
+<img src="images/GGX_E_LUT_split_sum.png">
+</div>
+
+然后在`KullaContyFragment.glsl`中修改$E(\mu_i)$和$E(\mu_o)$的计算。这里取$R_0 = 0$，因此对应的$E(\mu)$只需将纹理的RG两通道数值相加即可：
+
+```glsl
+vec3 MultiScatterBRDF(float NdotL, float NdotV)
+{
+    vec3 albedo = pow(texture2D(uAlbedoMap, vTextureCoord).rgb, vec3(2.2));
+
+    vec3 E_o = texture2D(uBRDFLut, vec2(NdotL, uRoughness)).xyz;
+    vec3 E_i = texture2D(uBRDFLut, vec2(NdotV, uRoughness)).xyz;
+
+    E_o = vec3(E_o.x + E_o.y);
+    E_i = vec3(E_i.x + E_i.y);
+
+    vec3 E_avg = texture2D(uEavgLut, vec2(0, uRoughness)).xyz;
+
+    // copper
+    vec3 edgetint = vec3(0.827, 0.792, 0.678);
+    vec3 F_avg = AverageFresnel(albedo, edgetint);
+    
+    // TODO: To calculate fms and missing energy here
+    vec3 F_ms = (vec3(1.0) - E_o) * (vec3(1.0) - E_i) / (PI * (vec3(1.0) - E_avg));
+    vec3 F_add= F_avg * E_avg / (vec3(1.0) - F_avg * (vec3(1.0) - E_avg));
+
+    return F_add*F_ms;
+}
+```
+
+实时端的代码可参见`homework4-SplitSum`相应的部分。最终得到材质的渲染结果如下图所示：
+
+<div align=center>
+<img src="images/PBRMaterial_SplitSum.jpg">
+</div>
 
 ## Reference
 [Real Shading in Unreal Engine 4](https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf)
