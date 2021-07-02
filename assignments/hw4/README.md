@@ -283,7 +283,7 @@ vec3 MultiScatterBRDF(float NdotL, float NdotV)
 最终得到PBR材质和Kulla-Conty材质的渲染结果如下图所示：
 
 <div align=center>
-<img src="images/PBRMaterial.jpg">
+<img src="images/PBRMaterial.JPG">
 </div>
 
 ## Bonus2 使用Split-Sum预计算$E(\mu)$
@@ -377,7 +377,7 @@ vec3 MultiScatterBRDF(float NdotL, float NdotV)
 实时端的代码可参见`homework4-SplitSum`相应的部分。最终得到材质的渲染结果如下图所示：
 
 <div align=center>
-<img src="images/PBRMaterial_SplitSum.jpg">
+<img src="images/PBRMaterial_SplitSum.JPG">
 </div>
 
 ## Reference
