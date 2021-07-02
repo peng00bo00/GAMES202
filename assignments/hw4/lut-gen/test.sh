@@ -4,8 +4,8 @@ mkdir build
 cd build
 cmake ..
 make -j8
-./lut-Emu-MC
+# ./lut-Emu-MC
 ./lut-Emu-IS
-./lut-Eavg-MC
-./lut-Eavg-IS
+# ./lut-Eavg-MC
+# ./lut-Eavg-IS
 cd ..

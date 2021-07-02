@@ -79,6 +79,9 @@ Vec3f IntegrateBRDF(Vec3f V, float roughness) {
     const float R0 = 1.0;
     float f = 0.0;
 
+    float A = 0.0;
+    float B = 0.0;
+
     for (int i = 0; i < sample_count; i++) {
         Vec2f Xi = Hammersley(i, sample_count);
         Vec3f H = ImportanceSampleGGX(Xi, N, roughness);
@@ -93,13 +96,16 @@ Vec3f IntegrateBRDF(Vec3f V, float roughness) {
         float G = GeometrySmith(roughness, NoV, NoL);
         float w = G * VoH / (NoH * NoV);
 
-        f += w / sample_count;
+        // f += w / sample_count;
 
         // Split Sum - Bonus 2
-        
+        float Fc = pow(1.0f - VoH, 5.0);
+        A += (1 - Fc) * w / sample_count;
+        B += Fc * w / sample_count;
     }
 
-    return Vec3f(f);
+    // return Vec3f(f);
+    return Vec3f(A, B, 0.0f);
 }
 
 int main() {
@@ -119,7 +125,8 @@ int main() {
         }
     }
     stbi_flip_vertically_on_write(true);
-    stbi_write_png("GGX_E_LUT.png", resolution, resolution, 3, data, resolution * 3);
+    // stbi_write_png("GGX_E_LUT.png", resolution, resolution, 3, data, resolution * 3);
+    stbi_write_png("GGX_E_LUT_split_sum.png", resolution, resolution, 3, data, resolution * 3);
     
     std::cout << "Finished precomputed!" << std::endl;
     return 0;
