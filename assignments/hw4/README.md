@@ -15,7 +15,7 @@
 
 $$
 \begin{aligned}
-    E(\mu_0) &= \int_{0}^{2\pi} \int_{0}^{1} f_r(\mu_0, \mu_i, \phi) \mu_i d \mu_i d \phi \\
+    E(\mu_o) &= \int_{0}^{2\pi} \int_{0}^{1} f_r(\mu_o, \mu_i, \phi) \mu_i d \mu_i d \phi \\
     &= \int_{0}^{2\pi} \int_{0}^{1} \frac{F(i, h) G(i, o, h) D(h)}{4 (h \cdot i) (n \cdot o) } \mu_i d \mu_i d \phi
 \end{aligned}
 $$
@@ -256,7 +256,7 @@ $$
 \end{aligned}
 $$
 
-其中$f_{\text{ms}}$为不考虑颜色情况下的能量补偿，而$f_{\text{add}}$为考虑物体自身颜色对能量吸收的情况下最终反射出能量的比例。二者相乘即为最终的能量补偿项。
+其中$f_{\text{ms}}$为不考虑物体自身颜色情况下的能量补偿，而$f_{\text{add}}$为考虑物体自身颜色对能量吸收的情况下最终反射出能量的比例。二者相乘即为最终的能量补偿项。
 
 在`MultiScatterBRDF()`函数中补充代码如下：
 ```glsl
@@ -280,7 +280,7 @@ vec3 MultiScatterBRDF(float NdotL, float NdotV)
 }
 ```
 
-最终得到PBR材质和Kulla-Conty材质的渲染结果如下图所示：
+最终得到Kulla-Conty材质和PBR材质的渲染结果如下图所示：
 
 <div align=center>
 <img src="images/PBRMaterial.JPG">
@@ -299,9 +299,21 @@ $$
 \end{aligned}
 $$
 
-其中$R_0$为基础反射率。上式表明对于任意材质其在$\mu$方向上反射的能量等于基础反射率$R_0$乘以某个常数$A$再加上另一个常数$B$。因此可以预先将常数$A$和$B$写入纹理中，在实际渲染时通过查询纹理来计算所需的$E(\mu)$。
+其中$R_0$为基础反射率，$\mu$为出射方向。上式表明对于任意材质其在$\mu$方向上反射的能量等于基础反射率$R_0$乘以某个常数$A$再加上另一个常数$B$。因此可以预先将常数$A$和$B$写入纹理中，在实际渲染时通过查询纹理来计算所需的$E(\mu)$。
 
-在代码方面首先需要修改`Emu_IS.cpp`中BRDF积分的部分，这里将$A$和$B$分别写入纹理的RG通道：
+在Split-Sum的基础上，求解渲染方程时可以将光照项分离出来：
+
+$$
+\begin{aligned}
+    \int_\Omega L_i f_r \cos{(\theta)} d \omega &\approx \frac{1}{N} \sum_{k=1}^N \frac{L_i(l_k) f_r(l_k) \cos{(\theta_{l_k})}}{p(l_k)} \\
+    &\approx \Big(\frac{1}{N} \sum_{k=1}^N L_i(l_k) \Big) \Big(\frac{1}{N} \sum_{k=1}^N \frac{f_r(l_k) \cos{(\theta_{l_k})}}{p(l_k)} \Big) \\
+    &= \bar{L}_i E(\mu)
+\end{aligned}
+$$
+
+上式表明任意点的着色可以近似为环境光照的平均值乘以$E(\mu)$。因此可以在离线端对环境光和$E(\mu)$分别进行预计算，实际渲染时直接相乘即可。本次作业中使用的是方向给定的光照，因此在求解渲染方程时无需进行积分，也没有使用到Split-Sum来进行加速。不过在计算BRDF能量补偿项时需要使用$E(\mu)$，这里可以通过Split-Sum来进行计算。
+
+代码方面首先需要修改`Emu_IS.cpp`中BRDF积分的部分，将$A$和$B$分别写入纹理的RG通道：
 ```cpp
 Vec3f IntegrateBRDF(Vec3f V, float roughness) {
 
