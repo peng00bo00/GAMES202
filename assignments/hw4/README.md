@@ -286,6 +286,8 @@ vec3 MultiScatterBRDF(float NdotL, float NdotV)
 <img src="images/PBRMaterial.JPG">
 </div>
 
+*注：作业框架中`KullaContyMaterial.js`存在一处笔误将`'uEavgLut'`写错成`'uEavgFLut'`，上图为修正后的结果*
+
 ## Bonus2 使用Split-Sum预计算$E(\mu)$
 
 根据Schlick近似可以将$E(\mu)$进行分解：
