@@ -1,2 +1,2 @@
 # GAMES202
-Materials for GAMES202 (https://sites.cs.ucsb.edu/~lingqi/teaching/games202.html).
+Course Materials for [GAMES 202: Real-Time High Quality Rendering](https://sites.cs.ucsb.edu/~lingqi/teaching/games202.html).
