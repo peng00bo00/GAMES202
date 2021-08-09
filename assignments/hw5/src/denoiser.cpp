@@ -15,6 +15,29 @@ void Denoiser::Reprojection(const FrameInfo &frameInfo) {
             // TODO: Reproject
             m_valid(x, y) = false;
             m_misc(x, y) = Float3(0.f);
+
+            // back projection
+            int curID = frameInfo.m_id(x, y);
+            Float3 p = frameInfo.m_position(x, y);
+            Matrix4x4 M_cur_inv = Inverse(frameInfo.m_matrix[curID]);
+            Matrix4x4 M_pre = m_preFrameInfo.m_matrix[curID];
+            Matrix4x4 P = preWorldToScreen * M_pre * M_cur_inv;
+
+            p = P(p, Float3::Point);
+
+            // validation check
+            if (p.x >= 0 && p.x < width && p.y >= 0 && p.y < height) {
+                // find ID in the previous frame
+                int i = int(p.x);
+                int j = int(p.y);
+                int preID = m_preFrameInfo.m_id(i, j);
+
+                if (curID == preID) {
+                    m_valid(x, y) = true;
+                    m_misc(x, y) = m_accColor(i, j);
+                }
+            }
+
         }
     }
     std::swap(m_misc, m_accColor);
@@ -29,8 +52,50 @@ void Denoiser::TemporalAccumulation(const Buffer2D<Float3> &curFilteredColor) {
         for (int x = 0; x < width; x++) {
             // TODO: Temporal clamp
             Float3 color = m_accColor(x, y);
+            Float3 mu, sig;
+
+            // filter window
+            int x1 = x - kernelRadius;
+            int x2 = x + kernelRadius;
+            int y1 = y - kernelRadius;
+            int y2 = y + kernelRadius;
+
+            if (x1 < 0) x1 = 0;
+            if (x2 > width) x2 = width;
+
+            if (y1 < 0) y1 = 0;
+            if (y2 > height) y2 = height;
+
+            int n = 0;
+            for (size_t i = x1; i < x2; ++i)
+            {
+                for (size_t j = y1; j < y2; ++j)
+                {
+                    mu += m_accColor(i, j);
+                    ++n;
+                }
+            }
+
+            // mean and std
+            mu = mu / n;
+
+            for (size_t i = x1; i < x2; ++i)
+            {
+                for (size_t j = y1; j < y2; ++j)
+                {
+                    sig += (m_accColor(i, j) - mu) * (m_accColor(i, j) - mu);
+                }
+            }
+
+            sig = sig / (n-1);
+            sig = SafeSqrt(sig);
+
+            color = Clamp(color, mu-sig*m_colorBoxK, mu+sig*m_colorBoxK);
+
             // TODO: Exponential moving average
-            float alpha = 1.0f;
+            float alpha = 1.0;
+            if (m_valid(x, y)) alpha = m_alpha;
+
             m_misc(x, y) = Lerp(color, curFilteredColor(x, y), alpha);
         }
     }
@@ -46,7 +111,68 @@ Buffer2D<Float3> Denoiser::Filter(const FrameInfo &frameInfo) {
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             // TODO: Joint bilateral filter
-            filteredImage(x, y) = frameInfo.m_beauty(x, y);
+            // filteredImage(x, y) = frameInfo.m_beauty(x, y);
+
+            // value and weight
+            Float3 v;
+            Float3 value_sum(0.0);
+            float w, wp, wc, wn, wd;
+            float weight_sum= 0.0;
+
+            // filter window
+            int x1 = x - kernelRadius;
+            int x2 = x + kernelRadius;
+            int y1 = y - kernelRadius;
+            int y2 = y + kernelRadius;
+
+            if (x1 < 0) x1 = 0;
+            if (x2 > width) x2 = width;
+
+            if (y1 < 0) y1 = 0;
+            if (y2 > height) y2 = height;
+
+            for (size_t i = x1; i < x2; ++i)
+            {
+                for (size_t j = y1; j < y2; ++j)
+                {
+                    // weights
+                    // position weight
+                    wp = (i-x)*(i-x) + (j-y)*(j-y);
+                    wp = wp / (2.0*m_sigmaCoord*m_sigmaCoord);
+
+                    // color weight
+                    Float3 Ci = frameInfo.m_beauty(x, y);
+                    Float3 Cj = frameInfo.m_beauty(i, j);
+
+                    wc = SqrDistance(Ci, Cj);
+                    wc = wc / (2.0*m_sigmaColor*m_sigmaColor);
+
+                    // normal weight
+                    Float3 Ni = frameInfo.m_normal(x, y);
+                    Float3 Nj = frameInfo.m_normal(i, j);
+
+                    wn = SafeAcos(Dot(Ni, Nj));
+                    wn = wn*wn / (2.0*m_sigmaNormal*m_sigmaNormal);
+
+                    // plane weight
+                    Float3 Pi = frameInfo.m_position(x, y);
+                    Float3 Pj = frameInfo.m_position(i, j);
+                    Float3 dP = Normalize(Pj - Pi);
+
+                    wp = Dot(Ni, dP);
+                    wp = wp*wp / (2.0*m_sigmaPlane*m_sigmaPlane);
+
+                    w = wp + wc + wn + wd;
+                    w = exp(-w);
+
+                    v = frameInfo.m_beauty(i, j);
+                    value_sum += v * w;
+                    weight_sum+= w;
+                }
+                
+            }
+
+            filteredImage(x, y) = value_sum / weight_sum;
         }
     }
     return filteredImage;
