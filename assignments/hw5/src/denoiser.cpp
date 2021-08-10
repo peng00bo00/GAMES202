@@ -238,11 +238,11 @@ Buffer2D<Float3> Denoiser::Filter(const FrameInfo &frameInfo) {
 
                         wd = Dot(Ni, dP);
                         wd = wd*wd / (2.0*m_sigmaPlane);
-
+                        
                         w = wp + wc + wn + wd;
                         w = exp(-w);
 
-                        Float3 v = cachedImage(i, j);
+                        Float3 v = cachedImage(xx, yy);
                         value_sum += v * w;
                         weight_sum+= w;
                     }
