@@ -120,6 +120,7 @@ for (int y = 0; y < height; y++) {
 
 <div align=center>
 <img src="images/pink_room.jpg">
+<img src="images/pink_room_output.jpg">
 </div>
 
 ## 反向投影
@@ -249,3 +250,105 @@ for (int y = 0; y < height; y++) {
 </div>
 
 ## Bonus1 À-Trous Wavelet 单帧降噪加速
+
+在进行单帧图像降噪时为了保证降噪的效果往往需要使用一个较大的卷积核，如本次作业中使用的是(32, 32)大小的核。在这样的情况下滤波会变得非常缓慢，难以满足实时的要求，因此需要考虑对单帧滤波进行加速。这里使用了À-Trous Wavelet的加速方法，其思想是把一个大的卷积核分解成若干个级联的小卷积核，在每次进行卷积时对核进行扩张从而近似原始的卷积。À-Trous Wavelet的示意图如下：
+
+<div align=center>
+<img src="images/atrous wavelet.png">
+</div>
+
+在本次作业中使用了3个级联的(5, 5)大小的卷积核来近似原始的(32, 32)卷积核。相应的代码和滤波结果如下：
+
+```cpp
+// À-Trous Wavelet
+int levels = 3;
+int h = 1;
+kernelRadius = 2;
+
+// initialize cache
+Buffer2D<Float3> cachedImage = CreateBuffer2D<Float3>(width, height);
+cachedImage.Copy(frameInfo.m_beauty);
+
+for (size_t l = 0; l < levels; l++)
+{
+    #pragma omp parallel for
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            // value and weight
+            Float3 value_sum(0.0);
+            float w, wp, wc, wn, wd;
+            float weight_sum= 0.0;
+
+            // filter on current level
+            for (int i = -kernelRadius; i <= kernelRadius; ++i)
+            {
+                for (int j = -kernelRadius; j <= kernelRadius; ++j) {
+                    int xx = x + h * i;
+                    int yy = y + h * j;
+
+                    if (xx < 0 || xx >= width || yy < 0 || yy >= height) continue;
+
+                    // weights
+                    // position weight
+                    wp = (xx-x)*(xx-x) + (yy-y)*(yy-y);
+                    wp = wp / (2.0*m_sigmaCoord);
+
+                    // color weight
+                    Float3 Ci = cachedImage(x, y);
+                    Float3 Cj = cachedImage(xx, yy);
+
+                    wc = SqrDistance(Ci, Cj);
+                    wc = wc / (2.0*m_sigmaColor);
+
+                    // normal weight
+                    Float3 Ni = frameInfo.m_normal(x, y);
+                    Float3 Nj = frameInfo.m_normal(xx, yy);
+
+                    wn = SafeAcos(Dot(Ni, Nj));
+                    wn = wn*wn / (2.0*m_sigmaNormal);
+
+                    // plane weight
+                    Float3 Pi = frameInfo.m_position(x, y);
+                    Float3 Pj = frameInfo.m_position(xx, yy);
+                    Float3 dP = Pj - Pi;
+                    if (Length(dP) > 0.0) dP = Normalize(dP);
+
+                    wd = Dot(Ni, dP);
+                    wd = wd*wd / (2.0*m_sigmaPlane);
+                    
+                    w = wp + wc + wn + wd;
+                    w = exp(-w);
+
+                    Float3 v = cachedImage(xx, yy);
+                    value_sum += v * w;
+                    weight_sum+= w;
+                }
+            }
+
+            filteredImage(x, y) = value_sum / weight_sum;
+        }
+    }
+
+    // update step length
+    h *= 2;
+
+    // update cache
+    cachedImage.Copy(filteredImage);
+}
+```
+
+<div align=center>
+<img src="images/box_input.jpg" width=400>
+<img src="images/box_atrous_output.jpg" width=400>
+</div>
+
+<div align=center>
+<img src="images/pink_room.jpg">
+<img src="images/pink_room_atrous_output.jpg">
+</div>
+
+不难发现使用À-Trous算法可以达到类似于直接使用大卷积核的效果。由于每个小卷积核进行滤波的计算代价都远小于大卷积核，因此À-Trous算法可以极大地加速单帧图像的滤波降噪过程。
+
+# Reference
+
+[Edge-avoiding À-Trous wavelet transform for fast global illumination filtering](https://jo.dreggn.org/home/2010_atrous.pdf)
