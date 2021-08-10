@@ -14,30 +14,35 @@ void Denoiser::Reprojection(const FrameInfo &frameInfo) {
         for (int x = 0; x < width; x++) {
             // TODO: Reproject
             m_valid(x, y) = false;
-            m_misc(x, y) = Float3(0.f);
+            m_misc(x, y) = m_accColor(x, y);
 
             // back projection
             int curID = frameInfo.m_id(x, y);
             Float3 p = frameInfo.m_position(x, y);
-            Matrix4x4 M_cur_inv = Inverse(frameInfo.m_matrix[curID]);
-            Matrix4x4 M_pre = m_preFrameInfo.m_matrix[curID];
-            Matrix4x4 P = preWorldToScreen * M_pre * M_cur_inv;
 
-            p = P(p, Float3::Point);
+            if (curID != -1) {
+                Matrix4x4 M_cur_inv = Inverse(frameInfo.m_matrix[curID]);
+                Matrix4x4 M_pre = m_preFrameInfo.m_matrix[curID];
+                Matrix4x4 P = preWorldToScreen * M_pre * M_cur_inv;
 
-            // validation check
-            if (p.x >= 0 && p.x < width && p.y >= 0 && p.y < height) {
-                // find ID in the previous frame
-                int i = int(p.x);
-                int j = int(p.y);
-                int preID = m_preFrameInfo.m_id(i, j);
+                p = P(p, Float3::Point);
 
-                if (curID == preID) {
-                    m_valid(x, y) = true;
-                    m_misc(x, y) = m_accColor(i, j);
+                p.x /= p.z;
+                p.y /= p.z;
+
+                // validation check
+                if (p.x >= 0 && p.x < width && p.y >= 0 && p.y < height) {
+                    // find ID in the previous frame
+                    int i = static_cast<int>(p.x);
+                    int j = static_cast<int>(p.y);
+                    int preID = m_preFrameInfo.m_id(i, j);
+
+                    if (curID == preID) {
+                        m_valid(x, y) = true;
+                        m_misc(x, y) = m_accColor(i, j);
+                    }
                 }
             }
-
         }
     }
     std::swap(m_misc, m_accColor);
@@ -83,7 +88,7 @@ void Denoiser::TemporalAccumulation(const Buffer2D<Float3> &curFilteredColor) {
             {
                 for (size_t j = y1; j < y2; ++j)
                 {
-                    sig += (m_accColor(i, j) - mu) * (m_accColor(i, j) - mu);
+                    sig += Sqr(m_accColor(i, j) - mu);
                 }
             }
 
@@ -111,10 +116,10 @@ Buffer2D<Float3> Denoiser::Filter(const FrameInfo &frameInfo) {
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             // TODO: Joint bilateral filter
-            // filteredImage(x, y) = frameInfo.m_beauty(x, y);
+            filteredImage(x, y) = frameInfo.m_beauty(x, y);
+            // continue;
 
             // value and weight
-            Float3 v;
             Float3 value_sum(0.0);
             float w, wp, wc, wn, wd;
             float weight_sum= 0.0;
@@ -138,40 +143,42 @@ Buffer2D<Float3> Denoiser::Filter(const FrameInfo &frameInfo) {
                     // weights
                     // position weight
                     wp = (i-x)*(i-x) + (j-y)*(j-y);
-                    wp = wp / (2.0*m_sigmaCoord*m_sigmaCoord);
+                    wp = wp / (2.0*m_sigmaCoord);
 
                     // color weight
                     Float3 Ci = frameInfo.m_beauty(x, y);
                     Float3 Cj = frameInfo.m_beauty(i, j);
 
                     wc = SqrDistance(Ci, Cj);
-                    wc = wc / (2.0*m_sigmaColor*m_sigmaColor);
+                    wc = wc / (2.0*m_sigmaColor);
 
                     // normal weight
                     Float3 Ni = frameInfo.m_normal(x, y);
                     Float3 Nj = frameInfo.m_normal(i, j);
 
                     wn = SafeAcos(Dot(Ni, Nj));
-                    wn = wn*wn / (2.0*m_sigmaNormal*m_sigmaNormal);
+                    wn = wn*wn / (2.0*m_sigmaNormal);
 
                     // plane weight
                     Float3 Pi = frameInfo.m_position(x, y);
                     Float3 Pj = frameInfo.m_position(i, j);
-                    Float3 dP = Normalize(Pj - Pi);
+                    Float3 dP = Pj - Pi;
+                    if (Length(dP) > 0.0) dP = Normalize(dP);
 
-                    wp = Dot(Ni, dP);
-                    wp = wp*wp / (2.0*m_sigmaPlane*m_sigmaPlane);
+                    wd = Dot(Ni, dP);
+                    wd = wd*wd / (2.0*m_sigmaPlane);
 
                     w = wp + wc + wn + wd;
                     w = exp(-w);
 
-                    v = frameInfo.m_beauty(i, j);
+                    Float3 v = frameInfo.m_beauty(i, j);
                     value_sum += v * w;
                     weight_sum+= w;
+
                 }
                 
             }
-
+        
             filteredImage(x, y) = value_sum / weight_sum;
         }
     }
@@ -190,12 +197,15 @@ void Denoiser::Maintain(const FrameInfo &frameInfo) { m_preFrameInfo = frameInfo
 
 Buffer2D<Float3> Denoiser::ProcessFrame(const FrameInfo &frameInfo) {
     // Filter current frame
+    std::cout << "filtering..." << std::endl;
     Buffer2D<Float3> filteredColor;
     filteredColor = Filter(frameInfo);
 
     // Reproject previous frame color to current
     if (m_useTemportal) {
+        std::cout << "reprojection..." << std::endl;
         Reprojection(frameInfo);
+        std::cout << "temporal accumulation..." << std::endl;
         TemporalAccumulation(filteredColor);
     } else {
         Init(frameInfo, filteredColor);
