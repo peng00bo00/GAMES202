@@ -71,21 +71,21 @@ for (int y = 0; y < height; y++) {
                 // weights
                 // position weight
                 wp = (i-x)*(i-x) + (j-y)*(j-y);
-                wp = wp / (2.0*m_sigmaCoord);
+                wp = wp / (2.0*m_sigmaCoord*m_sigmaCoord);
 
                 // color weight
                 Float3 Ci = frameInfo.m_beauty(x, y);
                 Float3 Cj = frameInfo.m_beauty(i, j);
 
                 wc = SqrDistance(Ci, Cj);
-                wc = wc / (2.0*m_sigmaColor);
+                wc = wc / (2.0*m_sigmaColor*m_sigmaColor);
 
                 // normal weight
                 Float3 Ni = frameInfo.m_normal(x, y);
                 Float3 Nj = frameInfo.m_normal(i, j);
 
                 wn = SafeAcos(Dot(Ni, Nj));
-                wn = wn*wn / (2.0*m_sigmaNormal);
+                wn = wn*wn / (2.0*m_sigmaNormal*m_sigmaNormal);
 
                 // plane weight
                 Float3 Pi = frameInfo.m_position(x, y);
@@ -94,7 +94,7 @@ for (int y = 0; y < height; y++) {
                 if (Length(dP) > 0.0) dP = Normalize(dP);
 
                 wd = Dot(Ni, dP);
-                wd = wd*wd / (2.0*m_sigmaPlane);
+                wd = wd*wd / (2.0*m_sigmaPlane*m_sigmaPlane);
 
                 w = wp + wc + wn + wd;
                 w = exp(-w);
@@ -106,7 +106,7 @@ for (int y = 0; y < height; y++) {
             }
         }
         
-        filteredImage(x, y) = value_sum / weight_sum;
+        if (weight_sum > 0.0) filteredImage(x, y) = value_sum / weight_sum;
     }
 }
 ```
@@ -291,21 +291,21 @@ for (size_t l = 0; l < levels; l++)
                     // weights
                     // position weight
                     wp = (xx-x)*(xx-x) + (yy-y)*(yy-y);
-                    wp = wp / (2.0*m_sigmaCoord);
+                    wp = wp / (2.0*m_sigmaCoord*m_sigmaCoord);
 
                     // color weight
                     Float3 Ci = cachedImage(x, y);
                     Float3 Cj = cachedImage(xx, yy);
 
                     wc = SqrDistance(Ci, Cj);
-                    wc = wc / (2.0*m_sigmaColor);
+                    wc = wc / (2.0*m_sigmaColor*m_sigmaColor);
 
                     // normal weight
                     Float3 Ni = frameInfo.m_normal(x, y);
                     Float3 Nj = frameInfo.m_normal(xx, yy);
 
                     wn = SafeAcos(Dot(Ni, Nj));
-                    wn = wn*wn / (2.0*m_sigmaNormal);
+                    wn = wn*wn / (2.0*m_sigmaNormal*m_sigmaNormal);
 
                     // plane weight
                     Float3 Pi = frameInfo.m_position(x, y);
@@ -314,7 +314,7 @@ for (size_t l = 0; l < levels; l++)
                     if (Length(dP) > 0.0) dP = Normalize(dP);
 
                     wd = Dot(Ni, dP);
-                    wd = wd*wd / (2.0*m_sigmaPlane);
+                    wd = wd*wd / (2.0*m_sigmaPlane*m_sigmaPlane);
                     
                     w = wp + wc + wn + wd;
                     w = exp(-w);
@@ -325,7 +325,8 @@ for (size_t l = 0; l < levels; l++)
                 }
             }
 
-            filteredImage(x, y) = value_sum / weight_sum;
+            if (weight_sum > 0.0) filteredImage(x, y) = value_sum / weight_sum;
+            else filteredImage(x, y) = cachedImage(x, y);
         }
     }
 
