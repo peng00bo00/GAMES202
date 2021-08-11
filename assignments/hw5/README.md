@@ -257,11 +257,11 @@ for (int y = 0; y < height; y++) {
 <img src="images/atrous wavelet.png">
 </div>
 
-在本次作业中使用了3个级联的(5, 5)大小的卷积核来近似原始的(32, 32)卷积核。相应的代码和滤波结果如下：
+在本次作业中使用了4个级联的(5, 5)大小的卷积核来近似原始的(32, 32)卷积核。相应的代码和滤波结果如下：
 
 ```cpp
 // À-Trous Wavelet
-int levels = 3;
+int levels = 4;
 int h = 1;
 kernelRadius = 2;
 
@@ -346,6 +346,16 @@ for (size_t l = 0; l < levels; l++)
 <div align=center>
 <img src="images/pink_room.jpg">
 <img src="images/pink_room_atrous_output.jpg">
+</div>
+
+<div align=center>
+<img src="images/box-input.gif" width=400>
+<img src="images/box-atrous-result.gif" width=400>
+</div>
+
+<div align=center>
+<img src="images/pinkroom-input.gif">
+<img src="images/pinkroom-atrous-result.gif">
 </div>
 
 不难发现使用À-Trous算法可以达到类似于直接使用大卷积核的效果。由于每个小卷积核进行滤波的计算代价都远小于大卷积核，因此À-Trous算法可以极大地加速单帧图像的滤波降噪过程。
