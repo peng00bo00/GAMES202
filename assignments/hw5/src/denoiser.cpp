@@ -182,7 +182,7 @@ Buffer2D<Float3> Denoiser::Filter(const FrameInfo &frameInfo) {
     // }
     
     // À-Trous Wavelet
-    int levels = 3;
+    int levels = 4;
     int h = 1;
     kernelRadius = 2;
 
@@ -258,7 +258,6 @@ Buffer2D<Float3> Denoiser::Filter(const FrameInfo &frameInfo) {
         cachedImage.Copy(filteredImage);
     }
     
-    
     return filteredImage;
 }
 
@@ -274,15 +273,12 @@ void Denoiser::Maintain(const FrameInfo &frameInfo) { m_preFrameInfo = frameInfo
 
 Buffer2D<Float3> Denoiser::ProcessFrame(const FrameInfo &frameInfo) {
     // Filter current frame
-    std::cout << "filtering..." << std::endl;
     Buffer2D<Float3> filteredColor;
     filteredColor = Filter(frameInfo);
 
     // Reproject previous frame color to current
     if (m_useTemportal) {
-        std::cout << "reprojection..." << std::endl;
         Reprojection(frameInfo);
-        std::cout << "temporal accumulation..." << std::endl;
         TemporalAccumulation(filteredColor);
     } else {
         Init(frameInfo, filteredColor);
