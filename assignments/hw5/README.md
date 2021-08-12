@@ -153,9 +153,6 @@ for (int y = 0; y < height; y++) {
 
             p = P(p, Float3::Point);
 
-            p.x /= p.z;
-            p.y /= p.z;
-
             // validation check
             if (p.x >= 0 && p.x < width && p.y >= 0 && p.y < height) {
                 // find ID in the previous frame
